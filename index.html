@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+
+<body>
+    <div id="main">
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/markdown-it/13.0.1/markdown-it.min.js"
+        integrity="sha512-SYfDUYPg5xspsG6OOpXU366G8SZsdHOhqk/icdrYJ2E/WKZxPxze7d2HD3AyXpT7U22PZ5y74xRpqZ6A2bJ+kQ=="
+        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script>
+        var md = window.markdownit();
+        var result = md.render('# markdown-it rulezz!');
+        let target = document.querySelector('#main');
+        let imgArr = [];
+
+        function visiable(dom){
+
+        }
+
+        class LazyFlow {
+            constructor(max){
+                this.max = max;
+                this.queue = [];
+                this.loaded = [];
+                this.loading = false;
+            }
+            add(dom, idx){
+                if(!this.loaded.includes(idx)){
+                    this.queue.add(idx);
+                    if(!this.loading){
+                        this.run();
+                    }
+                }
+            }
+            run(){
+                this.loading = true;
+            }
+        }
+        let flow = new LazyFlow();
+
+        let observer = new IntersectionObserver((entries) => {
+            let shouldLoad = false;
+            for(let item of entries){
+                if (!item.target.src){
+                    flow.add(item.target, parseInt(item.target.dataset.imgidx));
+                }
+            }
+        });
+
+        fetch('./demo.md').then(res => {
+            fs = res.text();
+            fs.then(text => {
+                let html = md.render(text);
+                let matches = html.match(/(<img src=['|"].*?['|"] .*?>)/g);
+                imgArr = Array.from(matches);
+                let imgIdx = 0;
+                html = html.replace(/<img src=['|"].*?['|"] .*?>/g,
+                    (str) => str.replace(/src=['|"].*?['|"]/, `src='' data-imgidx='${imgIdx++}'`));
+                console.log(imgArr.length);
+                target.innerHTML = html;
+
+                let imgDomList = document.querySelectorAll('img');
+                console.log(imgDomList.length);
+                imgDomList.forEach((dom) => observer.observe(dom));
+            });
+        }).catch(() => { });
+    </script>
+</body>
+
+</html>
