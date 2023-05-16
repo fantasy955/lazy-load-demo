@@ -22,36 +22,81 @@
         let target = document.querySelector('#main');
         let imgArr = [];
 
-        function visiable(dom){
-
+        function visible(el) {
+            const viewPortHeight = window.innerHeight || document.documentElement.clientHeight || document.body.clientHeight
+            const offsetTop = el.offsetTop
+            const scrollTop = document.documentElement.scrollTop
+            const top = offsetTop - scrollTop
+            return top <= viewPortHeight
         }
 
         class LazyFlow {
-            constructor(max){
+            constructor(max) {
                 this.max = max;
                 this.queue = [];
                 this.loaded = [];
                 this.loading = false;
+                this.runningNum = 0;
             }
-            add(dom, idx){
-                if(!this.loaded.includes(idx)){
-                    this.queue.add(idx);
-                    if(!this.loading){
+            add(img, idx) {
+                if (!this.loaded.includes(idx)) {
+                    this.queue.push([img, idx]);
+                    if (!this.loading) {
                         this.run();
                     }
                 }
             }
-            run(){
+            async run() {
                 this.loading = true;
+                console.log('开启懒加载流');
+                let taskPoll = [];
+                while (this.queue.length) {
+                    if (this.runningNum < this.max) {
+                        if(!visible(this.queue[0][0])){
+                            console.log(`img-${this.queue[0][1]} 不可见，移除`);
+                            this.queue.shift();
+                        }
+                        let [img, idx] = this.queue.shift();
+                        let task = new Promise((resolve, reject) => {
+                            img.src = imgArr[idx];
+                            img.onload = () => {
+                                console.log('loaded');
+                                resolve();
+                            }
+                            img.onerror = () => {
+                                reject();
+                            }
+                        }).then(() => {
+                            console.log(`img-${idx} 加载成功`);
+                        }).catch(() => {
+                            console.log(`img-${idx} 加载失败`);
+                            // this.loaded.splice(this.loaded.indexOf(idx), 1);
+                            // this.queue.push([img, idx]);
+                        }).finally(() => {
+                            this.runningNum--;
+                            taskPoll.splice(taskPoll.indexOf(task), 1);
+                        });
+                        this.runningNum++;
+                        taskPoll.push(task);
+                        this.loaded.push(idx);
+                    }
+                    if (this.runningNum >= this.max) {
+                        await Promise.race(taskPoll);
+                    }
+                }
+                this.loading = false;
+                console.log('结束懒加载流');
             }
         }
-        let flow = new LazyFlow();
+        let flow = new LazyFlow(2);
 
         let observer = new IntersectionObserver((entries) => {
             let shouldLoad = false;
-            for(let item of entries){
-                if (!item.target.src){
-                    flow.add(item.target, parseInt(item.target.dataset.imgidx));
+            for (let item of entries) {
+                let idx = parseInt(item.target.dataset.imgidx);
+                if (!flow.loaded.includes(idx)) {
+                    console.log(`add task img-${idx}`);
+                    flow.add(item.target, idx);
                 }
             }
         });
@@ -60,8 +105,14 @@
             fs = res.text();
             fs.then(text => {
                 let html = md.render(text);
-                let matches = html.match(/(<img src=['|"].*?['|"] .*?>)/g);
-                imgArr = Array.from(matches);
+                let matches = html.match(/<img src=['|"](.*?)['|"] .*?>/g);
+                if (matches) {
+                    imgArr = matches.map(match => {
+                        let srcMatch = /<img src=['"](.*?)['"] .*?>/g.exec(match);
+                        return srcMatch[1];
+                    });
+                }
+                console.log(imgArr);
                 let imgIdx = 0;
                 html = html.replace(/<img src=['|"].*?['|"] .*?>/g,
                     (str) => str.replace(/src=['|"].*?['|"]/, `src='' data-imgidx='${imgIdx++}'`));
