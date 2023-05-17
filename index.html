@@ -52,15 +52,15 @@
                 let taskPoll = [];
                 while (this.queue.length) {
                     if (this.runningNum < this.max) {
-                        if(!visible(this.queue[0][0])){
-                            console.log(`img-${this.queue[0][1]} 不可见，移除`);
-                            this.queue.shift();
-                        }
                         let [img, idx] = this.queue.shift();
+                        if (!visible(img)) {
+                            console.log(`img-${idx} 不可见，移除`);
+                            continue;
+                        }
                         let task = new Promise((resolve, reject) => {
+                            console.log(`开始加载 img-${idx}`);
                             img.src = imgArr[idx];
                             img.onload = () => {
-                                console.log('loaded');
                                 resolve();
                             }
                             img.onerror = () => {
@@ -91,6 +91,7 @@
         let flow = new LazyFlow(2);
 
         let observer = new IntersectionObserver((entries) => {
+            console.log('observe num:', entries.length);
             let shouldLoad = false;
             for (let item of entries) {
                 let idx = parseInt(item.target.dataset.imgidx);
